@@ -1,0 +1,5 @@
+{
+  "name": "LinkdHunter",
+  "description": "A smart job search assistant that finds recent #hiring posts on LinkedIn using AI search grounding and generates direct deep-links to filtered LinkedIn searches.",
+  "requestFramePermissions": []
+}
