@@ -12,21 +12,49 @@ const App: React.FC = () => {
   const [refinedKeywords, setRefinedKeywords] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+ // Helper function for creating a delay
+  const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
   const handleSearch = async (state: SearchState) => {
     setIsLoading(true);
     setError(null);
     setSearchState(state);
     
-    try {
-      const response: SearchResponse = await searchJobs(state.role, state.location);
-      setResults(response.posts);
-      setRefinedKeywords(response.refinedKeywords);
-    } catch (err: any) {
-      console.error(err);
-      setError("An error occurred while communicating with the AI. Please try again.");
-    } finally {
-      setIsLoading(false);
+    const maxRetries = 3;
+    let attempt = 0;
+
+    while (attempt < maxRetries) {
+      try {
+        const response: SearchResponse = await searchJobs(state.role, state.location);
+        setResults(response.posts);
+        setRefinedKeywords(response.refinedKeywords);
+        setIsLoading(false); // Success, stop loading
+        return; // Exit the function on success
+      } catch (err: any) {
+        console.error(`Attempt ${attempt + 1} failed:`, err);
+        
+        // IMPORTANT: Check if the error is specifically a rate limit error.
+        // The check for `err.status === 429` assumes your `searchJobs` service
+        // throws an error object with a `status` property. Adjust if necessary.
+        if (err.status === 429 && attempt < maxRetries - 1) {
+          const delay = Math.pow(2, attempt) * 1000; // Exponential backoff: 1s, 2s, 4s...
+          
+          // Update UI to inform the user
+          setError(`Too many requests. Retrying in ${delay / 1000} seconds...`);
+          
+          await wait(delay);
+          attempt++;
+        } else {
+          // For non-429 errors or if we've run out of retries, show the final error.
+          setError("An error occurred while communicating with the AI. Please try again.");
+          setIsLoading(false);
+          return; // Exit the function on final failure
+        }
+      }
     }
+    
+    // This part is reached if all retries fail.
+    setIsLoading(false);
   };
 
   return (
